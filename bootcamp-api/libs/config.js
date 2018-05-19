@@ -9,6 +9,10 @@ module.exports = {
         define: {
             underscored: true
         }
+    },
+    jwtSecret: 'BOO7CAMP-AP1',
+    jwtSession: {
+        session: false
     }
 
 };

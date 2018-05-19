@@ -1,10 +1,18 @@
+const {body, validationResult} = require('express-validator/check');
+const {matchedData} = require('express-validator/filter');
+
 module.exports = app => {
 
     const Tasks = app.db.models.Tasks;
 
     app.route('/tasks')
+    .all(app.auth.authenticate())
     .get((req, res) => {
-        Tasks.findAll()
+        Tasks.findAll({
+            where: {
+                user_id: req.user.id
+            }
+        })
         .then(result => {
             res.json(result);
         })
@@ -12,8 +20,19 @@ module.exports = app => {
             res.status(500).json({msg: error.message});
         });
     })    
-    .post((req, res) => {
-        Tasks.create(req.body)
+    .post([
+        body('title', 'Required field').exists(),
+        body('title', 'Invalid length').trim().isLength({ min: 1, max: 255 })
+    ],(req, res) => {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()){
+            return res.status(400).json({errors: errors.array()});
+        }
+        
+        const task = matchedData(req);
+        task.user_id = req.user.id;
+
+        Tasks.create(task)
         .then(result => {
             res.json(result);
         })
@@ -23,8 +42,14 @@ module.exports = app => {
     });
     
     app.route('/tasks/:id')
+    .all(app.auth.authenticate())
     .get((req, res) => {
-        Tasks.findById(req.params.id)
+        Tasks.findOne({
+            where: {
+                id: req.params.id,
+                user_id: req.user.id
+            }
+        })
         .then(result => {
             res.json(result);
         })
@@ -32,10 +57,20 @@ module.exports = app => {
             res.status(500).json({msg: error.message});
         });
     })
-    .put((req, res) => {
-        Tasks.update(req.body, {
+    .put([
+        body('title', 'Required field').exists(),
+        body('title', 'Invalid length').trim().isLength({ min: 1, max: 255 }),
+        body('done', 'Required field').exists(),
+        body('done', 'Not a boolean').isBoolean()
+    ], (req, res) => {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()){
+            return res.status(400).json({errors: errors.array()});
+        }
+        Tasks.update(matchedData(req), {
             where: {
-                id: req.params.id
+                id: req.params.id,
+                user_id: req.user.id
             }
         })
         .then(() => {
@@ -45,7 +80,8 @@ module.exports = app => {
     .delete((req, res) => {
         Tasks.destroy({
             where: {
-                id: req.params.id
+                id: req.params.id,
+                user_id: req.user.id
             }
         })
         .then(() => {
